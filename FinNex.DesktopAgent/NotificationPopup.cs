@@ -20,8 +20,12 @@ namespace FinNex.DesktopAgent
         private static readonly Color TitleColor = Color.White;
         private static readonly Color MetnColor  = Color.FromArgb(200, 200, 200);
         private static readonly Color BlueColor  = Color.FromArgb(100, 180, 255);
+        private static readonly Color DimColor   = Color.FromArgb(90, 90, 95);
 
-        internal NotificationPopup(string bashliq, string metn, string? url, string baseUrl)
+        /// <param name="autoCloseMs">0 = qalir; >0 = ms sonra avtomatik bağlanır</param>
+        internal NotificationPopup(
+            string bashliq, string metn, string? url, string baseUrl,
+            int autoCloseMs = 0)
         {
             _bashliq = bashliq;
             _metn    = metn;
@@ -33,12 +37,17 @@ namespace FinNex.DesktopAgent
             ShowInTaskbar   = false;
             StartPosition   = FormStartPosition.Manual;
             BackColor       = BgColor;
+            Cursor          = Cursors.Hand;
             Width           = 340;
 
-            _canvas = new Panel { Dock = DockStyle.Fill, BackColor = BgColor };
+            _canvas = new Panel
+            {
+                Dock      = DockStyle.Fill,
+                BackColor = BgColor,
+                Cursor    = Cursors.Hand
+            };
             _canvas.Paint      += OnCanvasPaint;
             _canvas.MouseClick += OnCanvasClick;
-            _canvas.MouseMove  += (_, _) => _canvas.Cursor = Cursors.Hand;
             Controls.Add(_canvas);
 
             const int pad = 12;
@@ -55,19 +64,40 @@ namespace FinNex.DesktopAgent
                 TextFormatFlags.WordBreak).Height + 4;
 
             int formH = pad + titleH + 6 + metnH + pad;
-            if (hasUrl) formH += 34;
+            if (hasUrl)      formH += 34;
+            if (autoCloseMs > 0) formH += 4; // progress bar üçün
             formH  = Math.Max(formH, 80);
             Height = formH;
 
             _closeHit = new Rectangle(Width - 32, 4, 26, 26);
             if (hasUrl)
-                _goHit = new Rectangle(Width - 120, formH - 32, 108, 24);
+                _goHit = new Rectangle(Width - 120, formH - (autoCloseMs > 0 ? 36 : 32), 108, 24);
 
             var wa = Screen.PrimaryScreen.WorkingArea;
             Location = new Point(wa.Right - Width - 8, wa.Bottom - Height - 8);
 
             Shown += (_, _) => { _canvas.Invalidate(); _canvas.Update(); };
+
+            // Avtomatik bağlama — progress bar ilə
+            if (autoCloseMs > 0)
+            {
+                const int steps    = 40;
+                int       interval = autoCloseMs / steps;
+                int       step     = 0;
+
+                var timer = new Timer { Interval = Math.Max(interval, 30) };
+                timer.Tick += (_, _) =>
+                {
+                    step++;
+                    _progressRatio = 1f - (float)step / steps;
+                    _canvas.Invalidate();
+                    if (step >= steps) { timer.Stop(); Close(); }
+                };
+                Shown += (_, _) => timer.Start();
+            }
         }
+
+        private float _progressRatio = -1f; // -1 = yox, 0..1 = qalıb
 
         private void OnCanvasPaint(object? s, PaintEventArgs e)
         {
@@ -92,8 +122,8 @@ namespace FinNex.DesktopAgent
                 TextFormatFlags.WordBreak | TextFormatFlags.Top);
 
             int titleH = TextRenderer.MeasureText(
-                _bashliq, titleFont, new Size(titleRect.Width, 0),
-                TextFormatFlags.WordBreak).Height;
+                _bashliq, titleFont,
+                new Size(titleRect.Width, 0), TextFormatFlags.WordBreak).Height;
 
             // Mətn
             var metnRect = new Rectangle(pad, pad + titleH + 6, w - pad * 2, 200);
@@ -111,12 +141,24 @@ namespace FinNex.DesktopAgent
                     BlueColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
+
+            // Progress bar (avtomatik bağlama varsa)
+            if (_progressRatio >= 0f)
+            {
+                int barW = (int)(w * _progressRatio);
+                using var barBrush = new SolidBrush(Color.FromArgb(80, 120, 200));
+                g.FillRectangle(barBrush, 0, Height - 4, barW, 4);
+                using var trackBrush = new SolidBrush(DimColor);
+                if (barW < w)
+                    g.FillRectangle(trackBrush, barW, Height - 4, w - barW, 4);
+            }
         }
 
         private void OnCanvasClick(object? s, MouseEventArgs e)
         {
             if (_closeHit.Contains(e.Location)) { Close(); return; }
             if (!string.IsNullOrEmpty(_url)) Navigate();
+            else Close();
         }
 
         private void Navigate()
