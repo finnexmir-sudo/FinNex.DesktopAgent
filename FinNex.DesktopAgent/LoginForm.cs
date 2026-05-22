@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -16,8 +16,9 @@ namespace FinNex.DesktopAgent
         private Label lblError;
         private readonly AppConfig _config;
 
-        public string Token { get; private set; }
-        public string IsciAd { get; private set; }
+        public string Token   { get; private set; }
+        public string IsciAd  { get; private set; }
+        public int    IsciId  { get; private set; }
 
         public LoginForm(AppConfig config)
         {
@@ -34,16 +35,16 @@ namespace FinNex.DesktopAgent
             this.MinimizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
 
-            Label lblUser = new Label { Text = "İstifadəçi adı:", Location = new Point(20, 25), Size = new Size(90, 20) };
-            txtUsername = new TextBox { Location = new Point(120, 22), Size = new Size(180, 20) };
+            Label lblUser = new Label { Text = "İstifadəçi adı:", Location = new System.Drawing.Point(20, 25), Size = new Size(90, 20) };
+            txtUsername = new TextBox { Location = new System.Drawing.Point(120, 22), Size = new Size(180, 20) };
 
-            Label lblPass = new Label { Text = "Şifrə:", Location = new Point(20, 65), Size = new Size(90, 20) };
-            txtPassword = new TextBox { Location = new Point(120, 62), Size = new Size(180, 20), PasswordChar = '*' };
+            Label lblPass = new Label { Text = "Şifrə:", Location = new System.Drawing.Point(20, 65), Size = new Size(90, 20) };
+            txtPassword = new TextBox { Location = new System.Drawing.Point(120, 62), Size = new Size(180, 20), PasswordChar = '*' };
 
-            btnLogin = new Button { Text = "Giriş Et", Location = new Point(120, 105), Size = new Size(180, 30) };
+            btnLogin = new Button { Text = "Giriş Et", Location = new System.Drawing.Point(120, 105), Size = new Size(180, 30) };
             btnLogin.Click += BtnLogin_Click;
 
-            lblError = new Label { Location = new Point(20, 145), Size = new Size(280, 30), ForeColor = Color.Red, TextAlign = ContentAlignment.MiddleCenter };
+            lblError = new Label { Location = new System.Drawing.Point(20, 145), Size = new Size(280, 30), ForeColor = System.Drawing.Color.Red, TextAlign = System.Drawing.ContentAlignment.MiddleCenter };
 
             this.Controls.AddRange(new Control[] { lblUser, txtUsername, lblPass, txtPassword, btnLogin, lblError });
         }
@@ -62,17 +63,16 @@ namespace FinNex.DesktopAgent
             try
             {
                 using var client = new HttpClient();
-                var response = await client.PostAsJsonAsync($"{_config.BaseUrl}/api/desktop/token", new
-                {
-                    username = txtUsername.Text,
-                    password = txtPassword.Text
-                });
+                var response = await client.PostAsJsonAsync(
+                    $"{_config.BaseUrl}/api/desktop/token",
+                    new { username = txtUsername.Text, password = txtPassword.Text });
 
                 if (response.IsSuccessStatusCode)
                 {
                     var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-                    Token = result.GetProperty("token").GetString();
+                    Token  = result.GetProperty("token").GetString();
                     IsciAd = result.GetProperty("ad").GetString();
+                    IsciId = result.GetProperty("isciId").GetInt32();
 
                     this.DialogResult = DialogResult.OK;
                     this.Close();
@@ -82,7 +82,7 @@ namespace FinNex.DesktopAgent
                     lblError.Text = "Giriş uğursuzdur! Məlumatları yoxlayın.";
                 }
             }
-            catch (Exception ex)
+            catch
             {
                 lblError.Text = "Serverlə əlaqə qurulmadı!";
             }
