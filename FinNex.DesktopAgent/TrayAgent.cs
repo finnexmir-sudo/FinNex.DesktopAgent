@@ -2,7 +2,6 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -17,7 +16,7 @@ namespace FinNex.DesktopAgent
         private readonly string _isciAd;
 
         private readonly NotifyIcon _notifyIcon;
-        private readonly SynchronizationContext _uiContext;
+        private readonly Control _uiMarshal;
         private HubConnection? _hubConnection;
         private volatile bool _disposed;
         private int _unreadCount;
@@ -25,11 +24,18 @@ namespace FinNex.DesktopAgent
 
         public TrayAgent(AppConfig config, string token, int isciId, string isciAd)
         {
-            _config    = config;
-            _token     = token;
-            _isciId    = isciId;
-            _isciAd    = isciAd;
-            _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
+            _config = config;
+            _token  = token;
+            _isciId = isciId;
+            _isciAd = isciAd;
+
+            // NotifyIcon Component-dir və pəncərə handle-i yaratmır, ona görə
+            // WinForms SynchronizationContext avtomatik quraşdırılmır. SignalR
+            // thread-indən UI thread-ə düzgün keçid (BeginInvoke) üçün UI
+            // thread-də handle-i olan görünməz Control yaradırıq. Əks halda
+            // popup Form message loop-suz thread-də yaradılır və ekrana çıxmır.
+            _uiMarshal = new Control();
+            _ = _uiMarshal.Handle;
 
             _notifyIcon = new NotifyIcon
             {
@@ -86,27 +92,30 @@ namespace FinNex.DesktopAgent
 
         private void ShowPopup(string bashliq, string metn, string? url, int autoCloseMs = 0)
         {
-            _uiContext.Post(_ =>
+            if (_disposed || _uiMarshal.IsDisposed || !_uiMarshal.IsHandleCreated)
+                return;
+
+            try
             {
-                if (_disposed) return;
-
-                if (url != null) { _unreadCount++; RefreshIcon(); }
-
-                var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl, autoCloseMs);
-                popup.FormClosed += (__, _e) =>
+                _uiMarshal.BeginInvoke(new Action(() =>
                 {
-                    if (url != null)
+                    if (_disposed) return;
+
+                    if (url != null) { _unreadCount++; RefreshIcon(); }
+
+                    var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl, autoCloseMs);
+                    popup.FormClosed += (__, _e) =>
                     {
-                        _uiContext.Post(___ =>
+                        if (url != null && _unreadCount > 0)
                         {
-                            if (_unreadCount > 0) _unreadCount--;
+                            _unreadCount--;
                             RefreshIcon();
-                        }, null);
-                    }
-                };
-                popup.Show();
-                popup.Refresh();
-            }, null);
+                        }
+                    };
+                    popup.Show();
+                }));
+            }
+            catch { }
         }
 
         private void RefreshIcon()
@@ -150,6 +159,7 @@ namespace FinNex.DesktopAgent
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _badgeIcon?.Dispose();
+            _uiMarshal.Dispose();
             if (_hubConnection != null)
                 _ = _hubConnection.DisposeAsync();
             Application.Exit();
