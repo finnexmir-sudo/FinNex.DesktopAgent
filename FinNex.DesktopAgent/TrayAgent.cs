@@ -22,16 +22,16 @@ namespace FinNex.DesktopAgent
 
         public TrayAgent(AppConfig config, string token, int isciId, string isciAd)
         {
-            _config = config;
-            _token = token;
-            _isciId = isciId;
-            _isciAd = isciAd;
+            _config   = config;
+            _token    = token;
+            _isciId   = isciId;
+            _isciAd   = isciAd;
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
             _notifyIcon = new NotifyIcon
             {
-                Icon = SystemIcons.Information,
-                Text = $"FinNex Agent - {_isciAd}",
+                Icon    = SystemIcons.Information,
+                Text    = $"FinNex Agent - {_isciAd}",
                 Visible = true
             };
 
@@ -54,7 +54,8 @@ namespace FinNex.DesktopAgent
                         ServerCertificateCustomValidationCallback = (_, _, _, _) => true
                     };
                 })
-                .WithAutomaticReconnect(new[] {
+                .WithAutomaticReconnect(new[]
+                {
                     TimeSpan.FromSeconds(2),
                     TimeSpan.FromSeconds(5),
                     TimeSpan.FromSeconds(10)
@@ -66,19 +67,19 @@ namespace FinNex.DesktopAgent
                 var bashliq = payload.TryGetProperty("bashliq", out var b) ? b.GetString() ?? "Bildiriş" : "Bildiriş";
                 var metn    = payload.TryGetProperty("metn",    out var m) ? m.GetString() ?? ""         : "";
                 var tarix   = payload.TryGetProperty("tarix",   out var t) ? t.GetString() ?? ""         : "";
-                ShowBalloon(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}");
+                ShowPopup(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}");
             });
 
             _hubConnection.Reconnected += _ =>
             {
-                ShowBalloon("FinNex", "Bağlantı bərpa olundu.");
+                ShowPopup("FinNex", "Bağlantı bərpa olundu.");
                 return Task.CompletedTask;
             };
 
             try
             {
                 await _hubConnection.StartAsync();
-                ShowBalloon("FinNex Sistem qoruyucusu", $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.");
+                ShowPopup("FinNex Sistem qoruyucusu", $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.");
             }
             catch
             {
@@ -86,12 +87,13 @@ namespace FinNex.DesktopAgent
             }
         }
 
-        private void ShowBalloon(string bashliq, string metn)
+        private void ShowPopup(string bashliq, string metn)
         {
             _uiContext.Post(_ =>
             {
                 if (_disposed) return;
-                _notifyIcon.ShowBalloonTip(8000, bashliq, metn, ToolTipIcon.Info);
+                var popup = new NotificationPopup(bashliq, metn);
+                popup.Show();
             }, null);
         }
 
