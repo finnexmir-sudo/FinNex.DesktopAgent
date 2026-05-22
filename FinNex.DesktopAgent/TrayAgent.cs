@@ -16,10 +16,9 @@ namespace FinNex.DesktopAgent
         private readonly string _isciAd;
 
         private readonly NotifyIcon _notifyIcon;
-        // SignalR callback-ləri thread pool-da işləyir;
-        // ShowBalloonTip düzgün göstərilmək üçün UI message loop thread-inə ehtiyac duyur.
         private readonly SynchronizationContext _uiContext;
         private HubConnection _hubConnection;
+        private volatile bool _disposed;
 
         public TrayAgent(AppConfig config, string token, int isciId, string isciAd)
         {
@@ -27,7 +26,6 @@ namespace FinNex.DesktopAgent
             _token = token;
             _isciId = isciId;
             _isciAd = isciAd;
-            // Constructor [STAThread] UI thread-ində işləyir — WindowsFormsSynchronizationContext-i yadda saxla
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
             _notifyIcon = new NotifyIcon
@@ -46,14 +44,11 @@ namespace FinNex.DesktopAgent
 
         private async Task ConnectAsync()
         {
-            // access_token: JWT Bearer auth üçün
-            // isciId: server tərəf OnConnectedAsync-də qrup adını YALNIZ query-dən oxuyur
             var hubUrl = $"{_config.BaseUrl}/notificationHub?access_token={_token}&isciId={_isciId}";
 
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
                 {
-                    // İnkişaf mühitlərindəki self-signed sertifikatları qəbul et
                     options.HttpMessageHandlerFactory = _ => new HttpClientHandler
                     {
                         ServerCertificateCustomValidationCallback = (_, _, _, _) => true
@@ -66,7 +61,6 @@ namespace FinNex.DesktopAgent
                 })
                 .Build();
 
-            // Server { bashliq, metn, tarix } object göndərir — JsonElement ilə al
             _hubConnection.On<JsonElement>("ReceiveDesktopNotification", payload =>
             {
                 var bashliq = payload.TryGetProperty("bashliq", out var b) ? b.GetString() ?? "Bildiriş" : "Bildiriş";
@@ -96,13 +90,14 @@ namespace FinNex.DesktopAgent
         {
             _uiContext.Post(_ =>
             {
-                if (_notifyIcon.IsDisposed) return;
+                if (_disposed) return;
                 _notifyIcon.ShowBalloonTip(8000, bashliq, metn, ToolTipIcon.Info);
             }, null);
         }
 
         private void Exit()
         {
+            _disposed = true;
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             if (_hubConnection != null)
