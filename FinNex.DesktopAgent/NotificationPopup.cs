@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FinNex.DesktopAgent
@@ -16,7 +15,7 @@ namespace FinNex.DesktopAgent
         private readonly Panel   _canvas;
         private Rectangle _closeHit;
         private Rectangle _goHit;
-        private volatile float _progressRatio = -1f;
+        private float     _progressRatio = -1f;
 
         private static readonly Color BgColor    = Color.FromArgb(50, 50, 54);
         private static readonly Color TitleColor = Color.White;
@@ -52,7 +51,7 @@ namespace FinNex.DesktopAgent
             Controls.Add(_canvas);
 
             const int pad = 12;
-            bool hasUrl   = !string.IsNullOrEmpty(url);
+            bool hasUrl = !string.IsNullOrEmpty(url);
 
             using var tf = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             using var mf = new Font("Segoe UI",  8.5f);
@@ -66,7 +65,7 @@ namespace FinNex.DesktopAgent
 
             int formH = pad + titleH + 6 + metnH + pad;
             if (hasUrl)          formH += 34;
-            if (autoCloseMs > 0) formH +=  4;
+            if (autoCloseMs > 0) formH +=  6; // progress bar
             formH  = Math.Max(formH, 80);
             Height = formH;
 
@@ -74,7 +73,7 @@ namespace FinNex.DesktopAgent
             if (hasUrl)
                 _goHit = new Rectangle(
                     Width - 120,
-                    formH - (autoCloseMs > 0 ? 36 : 32),
+                    formH - (autoCloseMs > 0 ? 38 : 34),
                     108, 24);
 
             var wa = Screen.PrimaryScreen!.WorkingArea;
@@ -84,32 +83,24 @@ namespace FinNex.DesktopAgent
 
             if (autoCloseMs > 0)
             {
-                _progressRatio   = 1f;
-                const int steps  = 40;
-                int interval     = Math.Max(autoCloseMs / steps, 30);
+                _progressRatio = 1f;
 
-                // Task.Delay isə əsaslanır — WinForms mesaj loopundan taməmilə asılı deyil.
-                // Invoke() UI thread-ə sinxron dönür.
-                _ = Task.Run(async () =>
+                // System.Threading.Timer: thread-pool-da işləyir.
+                // BeginInvoke: non-blocking — mesaj sırayına atır, UI thread-i bloklamaz.
+                // Bu ikisiə birgə UI donmasına səbəb olmaz.
+                System.Threading.Timer? t = null;
+                t = new System.Threading.Timer(_ =>
                 {
-                    for (int i = 1; i <= steps; i++)
+                    try
                     {
-                        await Task.Delay(interval).ConfigureAwait(false);
-                        float ratio = 1f - (float)i / steps;
-                        bool  done  = i >= steps;
-                        try
-                        {
-                            Invoke(new Action(() =>
-                            {
-                                if (IsDisposed) return;
-                                _progressRatio = ratio;
-                                _canvas.Invalidate();
-                                if (done) Close();
-                            }));
-                        }
-                        catch { break; }
+                        if (!IsDisposed && IsHandleCreated)
+                            BeginInvoke(new Action(() => { if (!IsDisposed) Close(); }));
                     }
-                });
+                    catch { }
+                    finally { t?.Dispose(); }
+                }, null, autoCloseMs, System.Threading.Timeout.Infinite);
+
+                FormClosed += (_, __) => { try { t?.Dispose(); } catch { } };
             }
         }
 
@@ -152,14 +143,14 @@ namespace FinNex.DesktopAgent
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
 
-            float pr = _progressRatio;
-            if (pr >= 0f)
+            // Static progress bar (no animation)
+            if (_progressRatio >= 0f)
             {
-                int barW = (int)(w * pr);
+                int barW = (int)(w * _progressRatio);
                 using var barBrush   = new SolidBrush(Color.FromArgb(80, 120, 200));
                 using var trackBrush = new SolidBrush(DimColor);
-                if (barW > 0)  g.FillRectangle(barBrush,   0,    Height - 4, barW,     4);
-                if (barW < w)  g.FillRectangle(trackBrush, barW, Height - 4, w - barW, 4);
+                if (barW > 0)  g.FillRectangle(barBrush,   0,    Height - 5, barW,     5);
+                if (barW < w)  g.FillRectangle(trackBrush, barW, Height - 5, w - barW, 5);
             }
         }
 
