@@ -25,10 +25,10 @@ namespace FinNex.DesktopAgent
 
         public TrayAgent(AppConfig config, string token, int isciId, string isciAd)
         {
-            _config   = config;
-            _token    = token;
-            _isciId   = isciId;
-            _isciAd   = isciAd;
+            _config    = config;
+            _token     = token;
+            _isciId    = isciId;
+            _isciAd    = isciAd;
             _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
             _notifyIcon = new NotifyIcon
@@ -84,11 +84,12 @@ namespace FinNex.DesktopAgent
             try
             {
                 await _hubConnection.StartAsync();
-                ShowPopup("FinNex Sistem qoruyucusu", $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.", null);
+                ShowPopup("FinNex Sistem qoruyucusu",
+                    $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.", null);
             }
             catch
             {
-                // WithAutomaticReconnect arxa fonda yenidən qoşulmaqı davam etdirəcək
+                // WithAutomaticReconnect arxa fonda davam etdirəcək
             }
         }
 
@@ -98,29 +99,28 @@ namespace FinNex.DesktopAgent
             {
                 if (_disposed) return;
 
-                if (url != null)
-                {
-                    _unreadCount++;
-                    RefreshIcon();
-                }
+                if (url != null) { _unreadCount++; RefreshIcon(); }
 
-                var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl);
+                var popup = NotificationPopup.Create(bashliq, metn, url, _config.BaseUrl);
                 popup.FormClosed += (__, _e) =>
                 {
                     if (url != null)
                     {
-                        if (_unreadCount > 0) _unreadCount--;
-                        RefreshIcon();
+                        _uiContext.Post(___ =>
+                        {
+                            if (_unreadCount > 0) _unreadCount--;
+                            RefreshIcon();
+                        }, null);
                     }
                 };
                 popup.Show();
+                popup.Refresh(); // DWM cache-ni məcburi yenilə
             }, null);
         }
 
         private void RefreshIcon()
         {
             if (_disposed) return;
-
             var old = _badgeIcon;
             if (_unreadCount > 0)
             {
@@ -147,12 +147,9 @@ namespace FinNex.DesktopAgent
             g.FillEllipse(Brushes.Red, badge);
 
             using var font = new Font("Arial", count > 9 ? 5.5f : 7f, FontStyle.Bold);
-            var sf = new StringFormat
-            {
-                Alignment     = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
-            g.DrawString(text, font, Brushes.White, badge, sf);
+            g.DrawString(text, font, Brushes.White, badge,
+                new StringFormat { Alignment = StringAlignment.Center,
+                                   LineAlignment = StringAlignment.Center });
 
             var icon = Icon.FromHandle(bmp.GetHicon());
             bmp.Dispose();
