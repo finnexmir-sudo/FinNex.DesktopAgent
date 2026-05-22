@@ -152,7 +152,8 @@ namespace FinNex.DesktopAgent
                 return Task.CompletedTask;
             };
 
-            _hubConnection.Closed += _ =>
+            // error parametri adı — içəridəki `_` discard-ı ilə toqquşmasın
+            _hubConnection.Closed += error =>
             {
                 if (!_disposed)
                 {
