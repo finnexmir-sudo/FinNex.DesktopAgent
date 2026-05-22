@@ -10,16 +10,17 @@ namespace FinNex.DesktopAgent
     /// <summary>
     /// Müasir dizaynlı masaüstü bildiriş popup-u.
     /// Sağ alt küncdən yuxarı sürüşərək çıxır, üst-üstə düzülür.
-    /// Hər BildirisNovu üçün fərqli rəng möv zus u var.
+    /// Hər BildirisNovu üçün fərqli rəng mövzusu var.
     /// </summary>
     internal sealed class NotificationPopup : Form
     {
         // ── Layout sabitləri ──────────────────────────────────────────
-        private const int W      = 360;
-        private const int H      = 115;
-        private const int Gap    = 8;
-        private const int Edge   = 14;
-        private const int Stripe = 5;
+        private const int W          = 360;
+        private const int H          = 115;
+        private const int Gap        = 8;
+        private const int Edge       = 14;
+        private const int Stripe     = 5;
+        private const int MaxVisible = 5;   // eyni anda ən çox 5 popup
 
         // ── Aktiv popup stack-i (hamisı UI thread-də — lock lazım deyil) ────
         private static readonly List<NotificationPopup> _stack = new();
@@ -39,8 +40,8 @@ namespace FinNex.DesktopAgent
         private System.Windows.Forms.Timer? _autoTimer;
         private int _targetY;
 
-        // ── × düyməsi hit rect ───────────────────────────────────────
-        private static readonly Rectangle CloseBox = new(W - 30, 6, 24, 24);
+        // ── × düyməsi hit rect (sağ üst künc — saatdan ayrı) ────────────
+        private static readonly Rectangle CloseBox = new(W - 28, 7, 22, 22);
 
         // ── Constructor ────────────────────────────────────────────────
         internal NotificationPopup(
@@ -68,6 +69,10 @@ namespace FinNex.DesktopAgent
             gp.CloseFigure();
             Region = new Region(gp);
             gp.Dispose();
+
+            // Eyni anda 5-dən çox popup olmasın — limit aşılarsa ən köhnəni bağla
+            while (_stack.Count >= MaxVisible)
+                _stack[0].SafeClose();
 
             // Mövqe: aşağıda başla, stack sayına görə hədəf hesabla
             var wa    = Screen.PrimaryScreen!.WorkingArea;
@@ -169,22 +174,22 @@ namespace FinNex.DesktopAgent
             g.DrawString(_icon, iconFont, ab,
                 new RectangleF(Stripe + 8, 10, 26, 26), sf);
 
-            // Başlıq
+            // Başlıq (saat və × düyməsinə qədər məhdud)
             using var titleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             using var white     = new SolidBrush(Color.White);
             g.DrawString(_bashliq, titleFont, white,
-                new RectangleF(Stripe + 40, 11, W - Stripe - 75, 24),
+                new RectangleF(Stripe + 40, 11, W - Stripe - 160, 24),
                 new StringFormat
                 {
                     LineAlignment = StringAlignment.Center,
                     Trimming      = StringTrimming.EllipsisCharacter
                 });
 
-            // Saat (sağ üst, solğun)
+            // Saat (sağ üst — × düyməsindən solda, üst-üstə düşməsin)
             using var dim      = new SolidBrush(Color.FromArgb(120, Color.White));
             using var timeFont = new Font("Segoe UI", 7.5f);
             g.DrawString(_timeStr, timeFont, dim,
-                new RectangleF(W - 56, 12, 44, 20),
+                new RectangleF(W - 112, 13, 76, 16),
                 new StringFormat
                 {
                     Alignment     = StringAlignment.Far,
@@ -206,9 +211,10 @@ namespace FinNex.DesktopAgent
                     FormatFlags = StringFormatFlags.LineLimit
                 });
 
-            // × bağla düyməsi
-            using var closeFont = new Font("Segoe UI", 13f);
-            g.DrawString("×", closeFont, dim, CloseBox, sf);
+            // × bağla düyməsi (sağ üst künc — daha parlaq)
+            using var closeBrush = new SolidBrush(Color.FromArgb(175, Color.White));
+            using var closeFont  = new Font("Segoe UI", 13f);
+            g.DrawString("×", closeFont, closeBrush, CloseBox, sf);
 
             sf.Dispose();
         }

@@ -16,11 +16,13 @@ namespace FinNex.DesktopAgent
         private readonly int _isciId;
         private readonly string _isciAd;
 
-        private readonly NotifyIcon       _notifyIcon;
-        private readonly Control          _uiMarshal;
+        private readonly NotifyIcon        _notifyIcon;
+        private readonly Control           _uiMarshal;
         private readonly ToolStripMenuItem _startupMenuItem;
         private HubConnection? _hubConnection;
         private volatile bool _disposed;
+        private volatile bool _connected;
+        private volatile bool _reconnectLoopActive;
         private int   _unreadCount;
         private Icon? _badgeIcon;
 
@@ -45,7 +47,7 @@ namespace FinNex.DesktopAgent
                 Visible = true
             };
 
-            // ── Context menyu ──────────────────────────────────────────────
+            // ── Context menyu ─────────────────────────────────────
             _startupMenuItem = new ToolStripMenuItem(
                 StartupLabel(), null, OnStartupToggle);
 
@@ -59,7 +61,7 @@ namespace FinNex.DesktopAgent
             _ = Task.Run(ConnectAsync);
         }
 
-        // ── Startup toggle ─────────────────────────────────────────────────
+        // ── Startup toggle ────────────────────────────────────────
 
         private static string StartupLabel() =>
             (StartupHelper.IsEnabled() ? "✓  " : "    ") + "Windows ilə başla";
@@ -70,13 +72,12 @@ namespace FinNex.DesktopAgent
             _startupMenuItem.Text = StartupLabel();
         }
 
-        // ── Yenidən Giriş Et ───────────────────────────────────────────────
+        // ── Yenidən Giriş Et ──────────────────────────────────────
 
         private void OnReLogin(object? sender, EventArgs e)
         {
             // Token cache-i sil ki yeni açılışda login sorulsun
             TokenCache.Clear();
-            // Proqramı yenidən başlat
             try
             {
                 Process.Start(new ProcessStartInfo(Application.ExecutablePath)
@@ -88,7 +89,7 @@ namespace FinNex.DesktopAgent
             Exit();
         }
 
-        // ── SignalR bağlantısı ─────────────────────────────────────────────
+        // ── SignalR bağlantısı ──────────────────────────────────────
 
         private async Task ConnectAsync()
         {
@@ -132,32 +133,35 @@ namespace FinNex.DesktopAgent
                     url, nov);
             });
 
-            // Bağlantı yenidən qurulmağa çalışır
+            // Bağlantı qısa müddət kəsildi — daxili auto-reconnect cəhd edir
             _hubConnection.Reconnecting += _ =>
             {
+                _connected = false;
+                RefreshIconSafe();
                 ShowBalloon("Serverlə bağlantı kəsildi, yenidən qoşulunur...",
                     ToolTipIcon.Warning);
                 return Task.CompletedTask;
             };
 
-            // Bağlantı uğurla bərpa edildi
+            // Daxili auto-reconnect uğurlu oldu
             _hubConnection.Reconnected += _ =>
             {
+                _connected = true;
+                RefreshIconSafe();
                 ShowBalloon("Serverə yenidən qoşuldu.", ToolTipIcon.Info);
                 return Task.CompletedTask;
             };
 
-            // Bütün yeniden-qoşulma cəhdləri uğursuz oldu
+            // Daxili auto-reconnect cəhdləri tükəndi — əl ilə loop başladırıq
             _hubConnection.Closed += _ =>
             {
                 if (!_disposed)
                 {
-                    // Token vaxtı keçmiş ola bilər — növbəti açılışda login sorulsun
-                    TokenCache.Clear();
-                    ShowBalloon(
-                        "Serverlə bağlantı kəsildi və bərpa edilə bilmədi.\n" +
-                        "Sağ klik → \"Yenidən Giriş Et\" basın.",
-                        ToolTipIcon.Error);
+                    _connected = false;
+                    RefreshIconSafe();
+                    ShowBalloon("Bağlantı kəsildi — yenidən qoşulmağa çalışılır...",
+                        ToolTipIcon.Warning);
+                    _ = ReconnectLoopAsync();
                 }
                 return Task.CompletedTask;
             };
@@ -165,13 +169,51 @@ namespace FinNex.DesktopAgent
             try
             {
                 // Task.Run içində çağrılır (SynchronizationContext = null).
-                // SignalR daxili loopları üçün UI context-i tutmur — UI donmaz.
                 await _hubConnection.StartAsync();
+                _connected = true;
+                RefreshIconSafe();
             }
-            catch { }
+            catch
+            {
+                // Server hələ əlçatan deyil — Closed event-i işə düşməyib,
+                // ona görə yenidən qoşulma loop-unu əl ilə başladırıq.
+                _connected = false;
+                RefreshIconSafe();
+                _ = ReconnectLoopAsync();
+            }
         }
 
-        // ── Balloon bildirişi ─────────────────────────────────────────────
+        // ── Yenidən qoşulma loop-u ──────────────────────────────────
+        // Server uzun müddət bağlı qalıb daxili auto-reconnect tükənəndə,
+        // hər 10 saniyədən bir yenidən qoşulmağa cəhd edir. Server qayıdanda
+        // agent avtomatik bərpa olur — əl ilə restart lazım deyil.
+        private async Task ReconnectLoopAsync()
+        {
+            if (_reconnectLoopActive) return;
+            _reconnectLoopActive = true;
+            try
+            {
+                while (!_disposed && !_connected)
+                {
+                    await Task.Delay(10000);
+                    if (_disposed || _connected) break;
+                    try
+                    {
+                        await _hubConnection!.StartAsync();
+                        _connected = true;
+                        RefreshIconSafe();
+                        ShowBalloon("Serverə yenidən qoşuldu.", ToolTipIcon.Info);
+                    }
+                    catch
+                    {
+                        // Server hələ əlçatan deyil — 10 saniyə sonra yenidən
+                    }
+                }
+            }
+            finally { _reconnectLoopActive = false; }
+        }
+
+        // ── Balloon bildirişi ───────────────────────────────────────
 
         private void ShowBalloon(string metn, ToolTipIcon icon)
         {
@@ -188,7 +230,7 @@ namespace FinNex.DesktopAgent
             catch { }
         }
 
-        // ── Popup bildirişi ───────────────────────────────────────────────
+        // ── Popup bildirişi ─────────────────────────────────────────
 
         private void ShowPopup(string bashliq, string metn, string? url,
                                int nov, int autoCloseMs = 0)
@@ -220,21 +262,40 @@ namespace FinNex.DesktopAgent
             catch { }
         }
 
-        // ── Tray icon badge ───────────────────────────────────────────────
+        // ── Tray icon ─────────────────────────────────────────────
+
+        // Başqa thread-dən çağırıla bilər — UI thread-ə marshal edir.
+        private void RefreshIconSafe()
+        {
+            if (_disposed || _uiMarshal.IsDisposed || !_uiMarshal.IsHandleCreated)
+                return;
+            try { _uiMarshal.BeginInvoke(new Action(RefreshIcon)); }
+            catch { }
+        }
 
         private void RefreshIcon()
         {
             if (_disposed) return;
             var old = _badgeIcon;
-            if (_unreadCount > 0)
+
+            if (!_connected)
+            {
+                // Serverlə bağlantı yoxdur — xəbərdarlıq ikonu
+                _badgeIcon       = null;
+                _notifyIcon.Icon = SystemIcons.Warning;
+                _notifyIcon.Text = "FinNex Agent — Bağlantı yoxdur";
+            }
+            else if (_unreadCount > 0)
             {
                 _badgeIcon       = BuildBadgeIcon(_unreadCount);
                 _notifyIcon.Icon = _badgeIcon;
+                _notifyIcon.Text = $"FinNex Agent - {_isciAd}";
             }
             else
             {
                 _badgeIcon       = null;
                 _notifyIcon.Icon = SystemIcons.Information;
+                _notifyIcon.Text = $"FinNex Agent - {_isciAd}";
             }
             old?.Dispose();
         }
@@ -260,7 +321,7 @@ namespace FinNex.DesktopAgent
             return icon;
         }
 
-        // ── Çıxış ────────────────────────────────────────────────────────
+        // ── Çıxış ───────────────────────────────────────────────
 
         private void Exit()
         {
