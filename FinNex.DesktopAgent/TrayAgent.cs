@@ -18,10 +18,10 @@ namespace FinNex.DesktopAgent
 
         private readonly NotifyIcon _notifyIcon;
         private readonly SynchronizationContext _uiContext;
-        private HubConnection _hubConnection;
+        private HubConnection? _hubConnection;
         private volatile bool _disposed;
         private int _unreadCount;
-        private Icon _badgeIcon;
+        private Icon? _badgeIcon;
 
         public TrayAgent(AppConfig config, string token, int isciId, string isciAd)
         {
@@ -67,28 +67,27 @@ namespace FinNex.DesktopAgent
 
             _hubConnection.On<JsonElement>("ReceiveDesktopNotification", payload =>
             {
-                var bashliq = payload.TryGetProperty("bashliq", out var b) ? b.GetString() ?? "Bildiriş" : "Bildiriş";
+                var bashliq = payload.TryGetProperty("bashliq", out var b) ? b.GetString() ?? "Bildiris" : "Bildiris";
                 var metn    = payload.TryGetProperty("metn",    out var m) ? m.GetString() ?? ""         : "";
                 var tarix   = payload.TryGetProperty("tarix",   out var t) ? t.GetString() ?? ""         : "";
                 var url     = payload.TryGetProperty("url",     out var u) && u.ValueKind == JsonValueKind.String
                               ? u.GetString() : null;
-                // Real bildirişlər qalir (autoCloseMs = 0)
                 ShowPopup(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}", url);
             });
 
             _hubConnection.Reconnected += _ =>
             {
-                // Qoşulma bildirişi 3 san sonra getsin
                 ShowPopup("FinNex", "Bağlantı bərpa olundu.", null, autoCloseMs: 3000);
                 return Task.CompletedTask;
             };
 
             try
             {
-                await _hubConnection.StartAsync();
-                // Xər gəldin bildirişi 3 san sonra getsin
+                // ConfigureAwait(false): UI SynchronizationContext-i tutmasın,
+                // əks halda SignalR daxili işləri UI thread-ə yüklənib donmağa səbəb olur.
+                await _hubConnection.StartAsync().ConfigureAwait(false);
                 ShowPopup("FinNex Sistem qoruyucusu",
-                    $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.",
+                    $"Xoş gəldiniz, {_isciAd}. Bildirisələr aktivdir.",
                     null, autoCloseMs: 3000);
             }
             catch { }
