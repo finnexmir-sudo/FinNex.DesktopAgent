@@ -1,133 +1,152 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Text;
 using System.Windows.Forms;
 
 namespace FinNex.DesktopAgent
 {
     internal class NotificationPopup : Form
     {
+        private readonly string _bashliq;
+        private readonly string _metn;
         private readonly string? _url;
         private readonly string _baseUrl;
-        private static readonly Color BgColor   = Color.FromArgb(45, 45, 48);
-        private static readonly Color TextColor = Color.FromArgb(230, 230, 230);
-        private static readonly Color DimColor  = Color.FromArgb(170, 170, 170);
+
+        private static readonly Color   BgColor    = Color.FromArgb(45, 45, 48);
+        private static readonly Color   TitleColor = Color.White;
+        private static readonly Color   MetnColor  = Color.FromArgb(190, 190, 190);
+        private static readonly Color   BlueColor  = Color.FromArgb(100, 180, 255);
+        private static readonly Font    TitleFont  = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        private static readonly Font    MetnFont   = new Font("Segoe UI",  8.5f);
+        private static readonly Font    SmallFont  = new Font("Segoe UI",  8.5f);
+        private static readonly Brush   TitleBrush = new SolidBrush(TitleColor);
+        private static readonly Brush   MetnBrush  = new SolidBrush(MetnColor);
+        private static readonly Brush   BlueBrush  = new SolidBrush(BlueColor);
+
+        private Rectangle _closeHit;
+        private Rectangle _goHit;
 
         internal NotificationPopup(string bashliq, string metn, string? url, string baseUrl)
         {
+            _bashliq = bashliq;
+            _metn    = metn;
             _url     = url;
             _baseUrl = baseUrl;
-
-            SuspendLayout();
 
             FormBorderStyle = FormBorderStyle.None;
             TopMost         = true;
             ShowInTaskbar   = false;
             StartPosition   = FormStartPosition.Manual;
             BackColor       = BgColor;
+            DoubleBuffered  = true;
             Width           = 340;
-            Font            = new Font("Segoe UI", 9f);
 
-            // ── Bağlama düyməsi ──
-            var btnClose = new Button
-            {
-                Text      = "✕",
-                ForeColor = DimColor,
-                BackColor = BgColor,
-                FlatStyle = FlatStyle.Flat,
-                Size      = new Size(28, 28),
-                Location  = new Point(Width - 34, 4),
-                Cursor    = Cursors.Hand,
-                TabStop   = false
-            };
-            btnClose.FlatAppearance.BorderSize         = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(70, 70, 73);
-            btnClose.Click += (_, _) => Close();
+            const int pad  = 12;
+            const int w    = 340;
 
-            // ── İkona ──
-            var picIcon = new PictureBox
-            {
-                Image     = SystemIcons.Information.ToBitmap(),
-                SizeMode  = PictureBoxSizeMode.StretchImage,
-                Size      = new Size(26, 26),
-                Location  = new Point(12, 14),
-                BackColor = BgColor
-            };
+            // Başlıq yüksəkliyi
+            var titleSz = TextRenderer.MeasureText(
+                bashliq, TitleFont, new Size(w - pad * 2 - 30, 0),
+                TextFormatFlags.WordBreak);
 
-            // ── Başlıq ──
-            var lblTitle = new Label
-            {
-                Text      = bashliq,
-                ForeColor = Color.White,
-                BackColor = BgColor,
-                Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-                Location  = new Point(46, 12),
-                Size      = new Size(Width - 46 - 38, 20),
-                AutoSize  = false
-            };
+            // Mətn yüksəkliyi
+            var metnSz = TextRenderer.MeasureText(
+                metn, MetnFont, new Size(w - pad * 2, 0),
+                TextFormatFlags.WordBreak);
 
-            // ── Mətn ──
-            var lblMetn = new Label
-            {
-                Text      = metn,
-                ForeColor = DimColor,
-                BackColor = BgColor,
-                Font      = new Font("Segoe UI", 8.5f),
-                Location  = new Point(12, 40),
-                Size      = new Size(Width - 24, 0),
-                AutoSize  = false
-            };
-            lblMetn.Height = TextRenderer.MeasureText(
-                metn, lblMetn.Font,
-                new Size(lblMetn.Width, int.MaxValue),
-                TextFormatFlags.WordBreak).Height + 4;
+            int titleH  = titleSz.Height + 4;
+            int metnH   = metnSz.Height  + 4;
+            int bodyBot = pad + titleH + 6 + metnH + pad;
 
-            int nextY = lblMetn.Bottom + 10;
-            var controls = new List<Control> { btnClose, picIcon, lblTitle, lblMetn };
+            bool hasUrl = !string.IsNullOrEmpty(url);
+            int  formH  = hasUrl ? bodyBot + 34 : bodyBot;
+            formH = Math.Max(formH, 75);
 
-            // ── Keçid düyməsi (yalnız URL varsa) ──
-            if (!string.IsNullOrEmpty(url))
-            {
-                var btnGo = new Button
-                {
-                    Text      = "→  Keçid Et",
-                    ForeColor = Color.FromArgb(100, 180, 255),
-                    BackColor = Color.FromArgb(55, 55, 58),
-                    FlatStyle = FlatStyle.Flat,
-                    Size      = new Size(100, 26),
-                    Location  = new Point(Width - 116, nextY - 2),
-                    Cursor    = Cursors.Hand,
-                    TabStop   = false
-                };
-                btnGo.FlatAppearance.BorderSize         = 1;
-                btnGo.FlatAppearance.BorderColor        = Color.FromArgb(80, 80, 83);
-                btnGo.FlatAppearance.MouseOverBackColor = Color.FromArgb(65, 65, 68);
-                btnGo.Click += (_, _) => Navigate();
-                controls.Add(btnGo);
+            Height = formH;
 
-                nextY = btnGo.Bottom + 10;
-
-                lblTitle.Cursor = Cursors.Hand;
-                lblMetn.Cursor  = Cursors.Hand;
-                lblTitle.Click += (_, _) => Navigate();
-                lblMetn.Click  += (_, _) => Navigate();
-            }
-
-            Height = Math.Max(nextY, 70);
+            _closeHit = new Rectangle(w - 32, 4, 26, 26);
+            if (hasUrl)
+                _goHit = new Rectangle(w - 118, formH - 32, 106, 24);
 
             var wa = Screen.PrimaryScreen.WorkingArea;
             Location = new Point(wa.Right - Width - 8, wa.Bottom - Height - 8);
 
-            Controls.AddRange(controls.ToArray());
-            ResumeLayout(true);
+            MouseClick += HandleClick;
+            MouseMove  += HandleMove;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            const int pad = 12;
+            int w = Width;
+
+            // Arxa fon (DoubleBuffer olsa da eəmin olmaq üçün)
+            g.Clear(BgColor);
+
+            // ─ Bağlama düyməsi
+            g.DrawString("✕", SmallFont, MetnBrush, _closeHit,
+                new StringFormat { Alignment = StringAlignment.Center,
+                                   LineAlignment = StringAlignment.Center });
+
+            // ─ Başlıq
+            g.DrawString(_bashliq, TitleFont, TitleBrush,
+                new RectangleF(pad, pad, w - pad * 2 - 32, 120));
+
+            var titleSz = TextRenderer.MeasureText(
+                _bashliq, TitleFont, new Size(w - pad * 2 - 30, 0),
+                TextFormatFlags.WordBreak);
+            int metnY = pad + titleSz.Height + 6;
+
+            // ─ Mətn
+            g.DrawString(_metn, MetnFont, MetnBrush,
+                new RectangleF(pad, metnY, w - pad * 2, 200));
+
+            // ─ "Keçid Et" düyməsi (URL varsa)
+            if (!string.IsNullOrEmpty(_url))
+            {
+                using var btnBg  = new SolidBrush(Color.FromArgb(58, 58, 62));
+                using var border = new Pen(Color.FromArgb(85, 85, 90));
+                g.FillRectangle(btnBg, _goHit);
+                g.DrawRectangle(border, _goHit);
+                g.DrawString("→  Keçid Et", SmallFont, BlueBrush, _goHit,
+                    new StringFormat { Alignment     = StringAlignment.Center,
+                                       LineAlignment = StringAlignment.Center });
+            }
+        }
+
+        private void HandleClick(object? s, MouseEventArgs e)
+        {
+            if (_closeHit.Contains(e.Location))
+            {
+                Close();
+            }
+            else if (!string.IsNullOrEmpty(_url) && _goHit.Contains(e.Location))
+            {
+                Navigate();
+            }
+            else if (!string.IsNullOrEmpty(_url))
+            {
+                Navigate(); // popup-un haraından kliklensə keçid edir
+            }
+        }
+
+        private void HandleMove(object? s, MouseEventArgs e)
+        {
+            bool onClose = _closeHit.Contains(e.Location);
+            bool onGo    = !string.IsNullOrEmpty(_url) && _goHit.Contains(e.Location);
+            Cursor = (onClose || onGo || !string.IsNullOrEmpty(_url))
+                ? Cursors.Hand : Cursors.Default;
         }
 
         private void Navigate()
         {
             if (string.IsNullOrEmpty(_url)) return;
-            var fullUrl = _baseUrl.TrimEnd('/') + _url;
-            Process.Start(new ProcessStartInfo(fullUrl) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(
+                _baseUrl.TrimEnd('/') + _url) { UseShellExecute = true });
             Close();
         }
     }
