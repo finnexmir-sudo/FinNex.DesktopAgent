@@ -8,6 +8,8 @@ namespace FinNex.DesktopAgent
 {
     internal class NotificationPopup : Form
     {
+        private readonly string  _bashliq;
+        private readonly string  _metn;
         private readonly string? _url;
         private readonly string  _baseUrl;
         private readonly Panel   _canvas;
@@ -21,6 +23,8 @@ namespace FinNex.DesktopAgent
 
         internal NotificationPopup(string bashliq, string metn, string? url, string baseUrl)
         {
+            _bashliq = bashliq;
+            _metn    = metn;
             _url     = url;
             _baseUrl = baseUrl;
 
@@ -31,14 +35,12 @@ namespace FinNex.DesktopAgent
             BackColor       = BgColor;
             Width           = 340;
 
-            // Panel bütün forma doldurur — öz Paint-ini işlədir
             _canvas = new Panel { Dock = DockStyle.Fill, BackColor = BgColor };
             _canvas.Paint      += OnCanvasPaint;
             _canvas.MouseClick += OnCanvasClick;
-            _canvas.MouseMove  += OnCanvasMove;
+            _canvas.MouseMove  += (_, _) => _canvas.Cursor = Cursors.Hand;
             Controls.Add(_canvas);
 
-            // Hündürlüyü mətnə görə hesabla
             const int pad = 12;
             bool hasUrl   = !string.IsNullOrEmpty(url);
 
@@ -48,14 +50,13 @@ namespace FinNex.DesktopAgent
             int titleH = TextRenderer.MeasureText(
                 bashliq, tf, new Size(Width - pad * 2 - 30, 0),
                 TextFormatFlags.WordBreak).Height + 4;
-
-            int metnH = TextRenderer.MeasureText(
+            int metnH  = TextRenderer.MeasureText(
                 metn, mf, new Size(Width - pad * 2, 0),
                 TextFormatFlags.WordBreak).Height + 4;
 
             int formH = pad + titleH + 6 + metnH + pad;
             if (hasUrl) formH += 34;
-            formH = Math.Max(formH, 80);
+            formH  = Math.Max(formH, 80);
             Height = formH;
 
             _closeHit = new Rectangle(Width - 32, 4, 26, 26);
@@ -65,40 +66,38 @@ namespace FinNex.DesktopAgent
             var wa = Screen.PrimaryScreen.WorkingArea;
             Location = new Point(wa.Right - Width - 8, wa.Bottom - Height - 8);
 
-            // Forma tam göründükdən sonra məcburi repaint
             Shown += (_, _) => { _canvas.Invalidate(); _canvas.Update(); };
         }
 
         private void OnCanvasPaint(object? s, PaintEventArgs e)
         {
-            var g   = e.Graphics;
+            var g = e.Graphics;
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
             g.Clear(BgColor);
 
             const int pad = 12;
-            int w         = Width;
-            bool hasUrl   = !string.IsNullOrEmpty(_url);
+            int w = Width;
+            bool hasUrl = !string.IsNullOrEmpty(_url);
 
             using var titleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             using var metnFont  = new Font("Segoe UI",  8.5f);
-            using var smallFont = new Font("Segoe UI",  8.5f);
 
-            // Bağlama
-            TextRenderer.DrawText(g, "✕", smallFont, _closeHit, MetnColor,
+            // Bağlama düyməsi
+            TextRenderer.DrawText(g, "✕", metnFont, _closeHit, MetnColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 
             // Başlıq
             var titleRect = new Rectangle(pad, pad, w - pad * 2 - 34, 120);
-            TextRenderer.DrawText(g, _bashliq(), titleFont, titleRect, TitleColor,
+            TextRenderer.DrawText(g, _bashliq, titleFont, titleRect, TitleColor,
                 TextFormatFlags.WordBreak | TextFormatFlags.Top);
 
             int titleH = TextRenderer.MeasureText(
-                _bashliq(), titleFont, new Size(titleRect.Width, 0),
+                _bashliq, titleFont, new Size(titleRect.Width, 0),
                 TextFormatFlags.WordBreak).Height;
 
             // Mətn
             var metnRect = new Rectangle(pad, pad + titleH + 6, w - pad * 2, 200);
-            TextRenderer.DrawText(g, _metn(), metnFont, metnRect, MetnColor,
+            TextRenderer.DrawText(g, _metn, metnFont, metnRect, MetnColor,
                 TextFormatFlags.WordBreak | TextFormatFlags.Top);
 
             // Keçid düyməsi
@@ -108,40 +107,16 @@ namespace FinNex.DesktopAgent
                 using var border = new Pen(Color.FromArgb(90, 90, 95));
                 g.FillRectangle(btnBg, _goHit);
                 g.DrawRectangle(border, _goHit);
-                TextRenderer.DrawText(g, "→  Keçid Et", smallFont, _goHit,
+                TextRenderer.DrawText(g, "→  Keçid Et", metnFont, _goHit,
                     BlueColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
         }
 
-        // _bashliq və _metn-i lazim olan string-lər
-        private string _bashliqVal = "";
-        private string _metnVal    = "";
-        private string _bashliq()  => _bashliqVal;
-        private string _metn()     => _metnVal;
-
-        // Constructor-dan sonra dəyərləri təyin etmək üçün factory
-        internal static NotificationPopup Create(
-            string bashliq, string metn, string? url, string baseUrl)
-        {
-            var p = new NotificationPopup(bashliq, metn, url, baseUrl);
-            p._bashliqVal = bashliq;
-            p._metnVal    = metn;
-            return p;
-        }
-
         private void OnCanvasClick(object? s, MouseEventArgs e)
         {
             if (_closeHit.Contains(e.Location)) { Close(); return; }
-            if (!string.IsNullOrEmpty(_url))
-            {
-                if (_goHit.Contains(e.Location) || true) Navigate();
-            }
-        }
-
-        private void OnCanvasMove(object? s, MouseEventArgs e)
-        {
-            _canvas.Cursor = Cursors.Hand;
+            if (!string.IsNullOrEmpty(_url)) Navigate();
         }
 
         private void Navigate()
