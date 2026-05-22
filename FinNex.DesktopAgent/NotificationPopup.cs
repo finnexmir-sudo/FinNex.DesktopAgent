@@ -37,21 +37,21 @@ namespace FinNex.DesktopAgent
             ShowInTaskbar   = false;
             StartPosition   = FormStartPosition.Manual;
             BackColor       = BgColor;
-            Cursor          = Cursors.Hand;
+            Cursor          = Cursors.Default;
             Width           = 340;
 
             _canvas = new Panel
             {
                 Dock      = DockStyle.Fill,
                 BackColor = BgColor,
-                Cursor    = Cursors.Hand
+                Cursor    = Cursors.Default
             };
             _canvas.Paint      += OnCanvasPaint;
             _canvas.MouseClick += OnCanvasClick;
             Controls.Add(_canvas);
 
-            const int pad = 12;
-            bool hasUrl = !string.IsNullOrEmpty(url);
+            const int pad   = 12;
+            bool      hasUrl = !string.IsNullOrEmpty(url);
 
             using var tf = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             using var mf = new Font("Segoe UI",  8.5f);
@@ -65,7 +65,7 @@ namespace FinNex.DesktopAgent
 
             int formH = pad + titleH + 6 + metnH + pad;
             if (hasUrl)          formH += 34;
-            if (autoCloseMs > 0) formH +=  6; // progress bar
+            if (autoCloseMs > 0) formH +=  6;
             formH  = Math.Max(formH, 80);
             Height = formH;
 
@@ -79,15 +79,11 @@ namespace FinNex.DesktopAgent
             var wa = Screen.PrimaryScreen!.WorkingArea;
             Location = new Point(wa.Right - Width - 8, wa.Bottom - Height - 8);
 
-            Shown += (_, _) => { _canvas.Invalidate(); _canvas.Update(); };
+            Shown += (_, _) => _canvas.Invalidate();
 
             if (autoCloseMs > 0)
             {
                 _progressRatio = 1f;
-
-                // System.Threading.Timer: thread-pool-da işləyir.
-                // BeginInvoke: non-blocking — mesaj sırayına atır, UI thread-i bloklamaz.
-                // Bu ikisiə birgə UI donmasına səbəb olmaz.
                 System.Threading.Timer? t = null;
                 t = new System.Threading.Timer(_ =>
                 {
@@ -99,7 +95,6 @@ namespace FinNex.DesktopAgent
                     catch { }
                     finally { t?.Dispose(); }
                 }, null, autoCloseMs, System.Threading.Timeout.Infinite);
-
                 FormClosed += (_, __) => { try { t?.Dispose(); } catch { } };
             }
         }
@@ -117,9 +112,13 @@ namespace FinNex.DesktopAgent
             using var titleFont = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             using var metnFont  = new Font("Segoe UI",  8.5f);
 
-            TextRenderer.DrawText(g, "✕", metnFont, _closeHit, MetnColor,
+            // X düyməsi
+            var xColor = _closeHit.Contains(_canvas.PointToClient(MousePosition))
+                ? Color.White : MetnColor;
+            TextRenderer.DrawText(g, "✕", metnFont, _closeHit, xColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 
+            // Başlıq
             var titleRect = new Rectangle(pad, pad, w - pad * 2 - 34, 120);
             TextRenderer.DrawText(g, _bashliq, titleFont, titleRect, TitleColor,
                 TextFormatFlags.WordBreak | TextFormatFlags.Top);
@@ -128,13 +127,18 @@ namespace FinNex.DesktopAgent
                 _bashliq, titleFont,
                 new Size(titleRect.Width, 0), TextFormatFlags.WordBreak).Height;
 
+            // Mətn
             var metnRect = new Rectangle(pad, pad + titleH + 6, w - pad * 2, 200);
             TextRenderer.DrawText(g, _metn, metnFont, metnRect, MetnColor,
                 TextFormatFlags.WordBreak | TextFormatFlags.Top);
 
+            // Keçid düyməsi
             if (hasUrl)
             {
-                using var btnBg  = new SolidBrush(Color.FromArgb(62, 62, 66));
+                bool hover = _goHit.Contains(_canvas.PointToClient(MousePosition));
+                using var btnBg  = new SolidBrush(hover
+                    ? Color.FromArgb(75, 75, 80)
+                    : Color.FromArgb(62, 62, 66));
                 using var border = new Pen(Color.FromArgb(90, 90, 95));
                 g.FillRectangle(btnBg, _goHit);
                 g.DrawRectangle(border, _goHit);
@@ -143,7 +147,7 @@ namespace FinNex.DesktopAgent
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
 
-            // Static progress bar (no animation)
+            // Progress bar (auto-close üçün)
             if (_progressRatio >= 0f)
             {
                 int barW = (int)(w * _progressRatio);
@@ -156,16 +160,32 @@ namespace FinNex.DesktopAgent
 
         private void OnCanvasClick(object? s, MouseEventArgs e)
         {
-            if (_closeHit.Contains(e.Location)) { Close(); return; }
-            if (!string.IsNullOrEmpty(_url)) Navigate();
-            else Close();
+            if (_closeHit.Contains(e.Location))
+            {
+                // X düyməsi: popup-u bağla
+                Close();
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(_url) && _goHit.Contains(e.Location))
+            {
+                // Keçid Et düyməsi: brauzerdə aç və bağla
+                Navigate();
+                return;
+            }
+
+            // Digər ərazələr: heç bir şey etmə (popup qalsın)
         }
 
         private void Navigate()
         {
             if (string.IsNullOrEmpty(_url)) return;
-            Process.Start(new ProcessStartInfo(
-                _baseUrl.TrimEnd('/') + _url) { UseShellExecute = true });
+            try
+            {
+                Process.Start(new ProcessStartInfo(
+                    _baseUrl.TrimEnd('/') + _url) { UseShellExecute = true });
+            }
+            catch { }
             Close();
         }
     }
