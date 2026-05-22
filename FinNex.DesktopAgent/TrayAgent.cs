@@ -78,7 +78,9 @@ namespace FinNex.DesktopAgent
                 var tarix   = payload.TryGetProperty("tarix",   out var t) ? t.GetString() ?? ""         : "";
                 var url     = payload.TryGetProperty("url",     out var u) && u.ValueKind == JsonValueKind.String
                               ? u.GetString() : null;
-                ShowPopup(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}", url);
+                var nov     = payload.TryGetProperty("nov",     out var n) && n.ValueKind == JsonValueKind.Number
+                              ? n.GetInt32() : 0;
+                ShowPopup(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}", url, nov);
             });
 
             try
@@ -90,7 +92,7 @@ namespace FinNex.DesktopAgent
             catch { }
         }
 
-        private void ShowPopup(string bashliq, string metn, string? url, int autoCloseMs = 0)
+        private void ShowPopup(string bashliq, string metn, string? url, int nov, int autoCloseMs = 0)
         {
             if (_disposed || _uiMarshal.IsDisposed || !_uiMarshal.IsHandleCreated)
                 return;
@@ -103,7 +105,7 @@ namespace FinNex.DesktopAgent
 
                     if (url != null) { _unreadCount++; RefreshIcon(); }
 
-                    var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl, autoCloseMs);
+                    var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl, nov, autoCloseMs);
                     popup.FormClosed += (__, _e) =>
                     {
                         if (url != null && _unreadCount > 0)
