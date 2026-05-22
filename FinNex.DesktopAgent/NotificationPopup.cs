@@ -90,6 +90,10 @@ namespace FinNex.DesktopAgent
                 _progressRatio     = 1f;
 
                 var timer = new System.Windows.Forms.Timer { Interval = interval };
+
+                // timer-i Form bağlananda təmizlə (Tick içindən deyil)
+                FormClosed += (_, _) => { timer.Stop(); timer.Dispose(); };
+
                 timer.Tick += (_, _) =>
                 {
                     step++;
@@ -98,12 +102,13 @@ namespace FinNex.DesktopAgent
                     if (step >= steps)
                     {
                         timer.Stop();
-                        timer.Dispose();
-                        if (!IsDisposed) Close();
+                        // BeginInvoke: Tick WndProc-dan çıxdıqdan sonra çağrılır
+                        if (!IsDisposed) BeginInvoke(new Action(Close));
                     }
                 };
-                // Timer birbaşa başlayır — Shown hadisəsindən asılı deyil.
-                // İlk tick 75 ms sonradır, bu vaxta qədər Show()/Refresh() artıq çağrılıb.
+
+                // Konstruktorda birbaşa başla — Show()-dan əvvəl də təhlukəsizdir,
+                // çünki ilk tick 75 ms sonradır və Show()/Refresh() artıq bitib.
                 timer.Start();
             }
         }
