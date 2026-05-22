@@ -75,20 +75,10 @@ namespace FinNex.DesktopAgent
                 ShowPopup(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}", url);
             });
 
-            _hubConnection.Reconnected += _ =>
-            {
-                ShowPopup("FinNex", "Bağlantı bərpa olundu.", null, autoCloseMs: 3000);
-                return Task.CompletedTask;
-            };
-
             try
             {
-                // ConfigureAwait(false): UI thread-i tutmasın, SignalR-ın daxili
-                // davami thread pool-da qalsın, mesaj loopunu bloklamasın.
                 await _hubConnection.StartAsync().ConfigureAwait(false);
-                ShowPopup("FinNex Sistem qoruyucusu",
-                    $"Xoş gəldiniz, {_isciAd}. Bildirisələr aktivdir.",
-                    null, autoCloseMs: 3000);
+                // Xos geldin ve reconnect popup-lari silindi — ses-kuy olmadan arxa fonda işləyir.
             }
             catch { }
         }
