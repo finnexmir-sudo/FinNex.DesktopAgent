@@ -8,42 +8,58 @@ namespace FinNex.DesktopAgent
 {
     internal class NotificationPopup : Form
     {
+        // Server-dəki BildirisNovu.IsGunuBitdi enum dəyəri.
+        // Bu növ bildiriş digərlərindən fərqli (yaşıl) rəngdə göstərilir.
+        private const int NovIsGunuBitdi = 43;
+
         private readonly string  _bashliq;
         private readonly string  _metn;
         private readonly string? _url;
         private readonly string  _baseUrl;
         private readonly Panel   _canvas;
+        private readonly Color   _bgColor;
+        private readonly Color   _accentColor;
         private Rectangle _closeHit;
         private Rectangle _goHit;
         private float     _progressRatio = -1f;
 
-        private static readonly Color BgColor    = Color.FromArgb(50, 50, 54);
         private static readonly Color TitleColor = Color.White;
-        private static readonly Color MetnColor  = Color.FromArgb(200, 200, 200);
-        private static readonly Color BlueColor  = Color.FromArgb(100, 180, 255);
+        private static readonly Color MetnColor  = Color.FromArgb(205, 205, 205);
         private static readonly Color DimColor   = Color.FromArgb(90, 90, 95);
 
         internal NotificationPopup(
             string bashliq, string metn, string? url, string baseUrl,
-            int autoCloseMs = 0)
+            int nov = 0, int autoCloseMs = 0)
         {
             _bashliq = bashliq;
             _metn    = metn;
             _url     = url;
             _baseUrl = baseUrl;
 
+            // İş günü bitdi bildirişi — yaşıl fon; digərləri — tünd boz fon.
+            if (nov == NovIsGunuBitdi)
+            {
+                _bgColor     = Color.FromArgb(30, 62, 43);
+                _accentColor = Color.FromArgb(120, 220, 150);
+            }
+            else
+            {
+                _bgColor     = Color.FromArgb(50, 50, 54);
+                _accentColor = Color.FromArgb(100, 180, 255);
+            }
+
             FormBorderStyle = FormBorderStyle.None;
             TopMost         = true;
             ShowInTaskbar   = false;
             StartPosition   = FormStartPosition.Manual;
-            BackColor       = BgColor;
+            BackColor       = _bgColor;
             Cursor          = Cursors.Default;
             Width           = 340;
 
             _canvas = new Panel
             {
                 Dock      = DockStyle.Fill,
-                BackColor = BgColor,
+                BackColor = _bgColor,
                 Cursor    = Cursors.Default
             };
             _canvas.Paint      += OnCanvasPaint;
@@ -103,7 +119,7 @@ namespace FinNex.DesktopAgent
         {
             var g = e.Graphics;
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
-            g.Clear(BgColor);
+            g.Clear(_bgColor);
 
             const int pad = 12;
             int       w   = Width;
@@ -143,7 +159,7 @@ namespace FinNex.DesktopAgent
                 g.FillRectangle(btnBg, _goHit);
                 g.DrawRectangle(border, _goHit);
                 TextRenderer.DrawText(g, "→  Keçid Et", metnFont, _goHit,
-                    BlueColor,
+                    _accentColor,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
 
@@ -151,7 +167,7 @@ namespace FinNex.DesktopAgent
             if (_progressRatio >= 0f)
             {
                 int barW = (int)(w * _progressRatio);
-                using var barBrush   = new SolidBrush(Color.FromArgb(80, 120, 200));
+                using var barBrush   = new SolidBrush(_accentColor);
                 using var trackBrush = new SolidBrush(DimColor);
                 if (barW > 0)  g.FillRectangle(barBrush,   0,    Height - 5, barW,     5);
                 if (barW < w)  g.FillRectangle(trackBrush, barW, Height - 5, w - barW, 5);
