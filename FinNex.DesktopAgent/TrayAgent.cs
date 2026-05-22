@@ -83,8 +83,8 @@ namespace FinNex.DesktopAgent
 
             try
             {
-                // ConfigureAwait(false): UI SynchronizationContext-i tutmasın,
-                // əks halda SignalR daxili işləri UI thread-ə yüklənib donmağa səbəb olur.
+                // ConfigureAwait(false): UI thread-i tutmasın, SignalR-ın daxili
+                // davami thread pool-da qalsın, mesaj loopunu bloklamasın.
                 await _hubConnection.StartAsync().ConfigureAwait(false);
                 ShowPopup("FinNex Sistem qoruyucusu",
                     $"Xoş gəldiniz, {_isciAd}. Bildirisələr aktivdir.",
