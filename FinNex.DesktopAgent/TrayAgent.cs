@@ -35,8 +35,8 @@ namespace FinNex.DesktopAgent
 
             // NotifyIcon Component-dir və pəncərə handle-i yaratmır, ona görə
             // WinForms SynchronizationContext avtomatik quraşdırılmır. SignalR
-            // thread-indən UI thread-ə düzgün keçid (BeginInvoke) üçün UI
-            // thread-də handle-i olan görünməz Control yaradırıq.
+            // thread-indən UI thread-ə düzgün keçid üçün UI thread-də handle-i
+            // olan görünməz Control yaradırıq.
             _uiMarshal = new Control();
             _ = _uiMarshal.Handle;
 
@@ -58,6 +58,9 @@ namespace FinNex.DesktopAgent
             contextMenu.Items.Add("Çıxış", null, (_, _) => Exit());
             _notifyIcon.ContextMenuStrip = contextMenu;
 
+            // Popup-lar tray badge sayını bu callback ilə bildirir
+            NotificationPopup.UnreadChanged = OnUnreadChanged;
+
             _ = Task.Run(ConnectAsync);
         }
 
@@ -76,7 +79,6 @@ namespace FinNex.DesktopAgent
 
         private void OnReLogin(object? sender, EventArgs e)
         {
-            // Token cache-i sil ki yeni açılışda login sorulsun
             TokenCache.Clear();
             try
             {
@@ -133,7 +135,6 @@ namespace FinNex.DesktopAgent
                     url, nov);
             });
 
-            // Bağlantı qısa müddət kəsildi — daxili auto-reconnect cəhd edir
             _hubConnection.Reconnecting += _ =>
             {
                 _connected = false;
@@ -143,7 +144,6 @@ namespace FinNex.DesktopAgent
                 return Task.CompletedTask;
             };
 
-            // Daxili auto-reconnect uğurlu oldu
             _hubConnection.Reconnected += _ =>
             {
                 _connected = true;
@@ -152,7 +152,6 @@ namespace FinNex.DesktopAgent
                 return Task.CompletedTask;
             };
 
-            // Daxili auto-reconnect cəhdləri tükəndi — əl ilə loop başladırıq
             _hubConnection.Closed += _ =>
             {
                 if (!_disposed)
@@ -168,15 +167,12 @@ namespace FinNex.DesktopAgent
 
             try
             {
-                // Task.Run içində çağrılır (SynchronizationContext = null).
                 await _hubConnection.StartAsync();
                 _connected = true;
                 RefreshIconSafe();
             }
             catch
             {
-                // Server hələ əlçatan deyil — Closed event-i işə düşməyib,
-                // ona görə yenidən qoşulma loop-unu əl ilə başladırıq.
                 _connected = false;
                 RefreshIconSafe();
                 _ = ReconnectLoopAsync();
@@ -185,8 +181,7 @@ namespace FinNex.DesktopAgent
 
         // ── Yenidən qoşulma loop-u ──────────────────────────────────
         // Server uzun müddət bağlı qalıb daxili auto-reconnect tükənəndə,
-        // hər 10 saniyədən bir yenidən qoşulmağa cəhd edir. Server qayıdanda
-        // agent avtomatik bərpa olur — əl ilə restart lazım deyil.
+        // hər 10 saniyədən bir yenidən qoşulmağa cəhd edir.
         private async Task ReconnectLoopAsync()
         {
             if (_reconnectLoopActive) return;
@@ -243,20 +238,9 @@ namespace FinNex.DesktopAgent
                 _uiMarshal.BeginInvoke(new Action(() =>
                 {
                     if (_disposed) return;
-
-                    if (url != null) { _unreadCount++; RefreshIcon(); }
-
-                    var popup = new NotificationPopup(
+                    // Eyni kateqoriyadan popup varsa sayı artır, yoxsa yeni yarat
+                    NotificationPopup.ShowOrUpdate(
                         bashliq, metn, url, _config.BaseUrl, nov, autoCloseMs);
-                    popup.FormClosed += (_, _) =>
-                    {
-                        if (url != null && _unreadCount > 0)
-                        {
-                            _unreadCount--;
-                            RefreshIcon();
-                        }
-                    };
-                    popup.Show();
                 }));
             }
             catch { }
@@ -264,7 +248,13 @@ namespace FinNex.DesktopAgent
 
         // ── Tray icon ─────────────────────────────────────────────
 
-        // Başqa thread-dən çağırıla bilər — UI thread-ə marshal edir.
+        // Popup-lardan gələn badge sayı (UI thread-də çağrılır).
+        private void OnUnreadChanged(int total)
+        {
+            _unreadCount = total;
+            RefreshIconSafe();
+        }
+
         private void RefreshIconSafe()
         {
             if (_disposed || _uiMarshal.IsDisposed || !_uiMarshal.IsHandleCreated)
@@ -280,7 +270,6 @@ namespace FinNex.DesktopAgent
 
             if (!_connected)
             {
-                // Serverlə bağlantı yoxdur — xəbərdarlıq ikonu
                 _badgeIcon       = null;
                 _notifyIcon.Icon = SystemIcons.Warning;
                 _notifyIcon.Text = "FinNex Agent — Bağlantı yoxdur";
@@ -326,6 +315,7 @@ namespace FinNex.DesktopAgent
         private void Exit()
         {
             _disposed = true;
+            NotificationPopup.UnreadChanged = null;
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _badgeIcon?.Dispose();
