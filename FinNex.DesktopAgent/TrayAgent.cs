@@ -87,10 +87,7 @@ namespace FinNex.DesktopAgent
                 ShowPopup("FinNex Sistem qoruyucusu",
                     $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.", null);
             }
-            catch
-            {
-                // WithAutomaticReconnect arxa fonda davam etdirəcək
-            }
+            catch { }
         }
 
         private void ShowPopup(string bashliq, string metn, string? url)
@@ -101,7 +98,7 @@ namespace FinNex.DesktopAgent
 
                 if (url != null) { _unreadCount++; RefreshIcon(); }
 
-                var popup = NotificationPopup.Create(bashliq, metn, url, _config.BaseUrl);
+                var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl);
                 popup.FormClosed += (__, _e) =>
                 {
                     if (url != null)
@@ -114,7 +111,7 @@ namespace FinNex.DesktopAgent
                     }
                 };
                 popup.Show();
-                popup.Refresh(); // DWM cache-ni məcburi yenilə
+                popup.Refresh();
             }, null);
         }
 
@@ -141,16 +138,13 @@ namespace FinNex.DesktopAgent
             using var g = Graphics.FromImage(bmp);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.DrawIcon(SystemIcons.Information, new Rectangle(0, 0, 32, 32));
-
             var text  = count > 99 ? "99+" : count.ToString();
             var badge = new RectangleF(17, 0, 14, 14);
             g.FillEllipse(Brushes.Red, badge);
-
             using var font = new Font("Arial", count > 9 ? 5.5f : 7f, FontStyle.Bold);
             g.DrawString(text, font, Brushes.White, badge,
                 new StringFormat { Alignment = StringAlignment.Center,
                                    LineAlignment = StringAlignment.Center });
-
             var icon = Icon.FromHandle(bmp.GetHicon());
             bmp.Dispose();
             return icon;
