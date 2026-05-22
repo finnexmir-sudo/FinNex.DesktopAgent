@@ -72,25 +72,29 @@ namespace FinNex.DesktopAgent
                 var tarix   = payload.TryGetProperty("tarix",   out var t) ? t.GetString() ?? ""         : "";
                 var url     = payload.TryGetProperty("url",     out var u) && u.ValueKind == JsonValueKind.String
                               ? u.GetString() : null;
+                // Real bildirişlər qalir (autoCloseMs = 0)
                 ShowPopup(bashliq, string.IsNullOrEmpty(tarix) ? metn : $"{metn}\n{tarix}", url);
             });
 
             _hubConnection.Reconnected += _ =>
             {
-                ShowPopup("FinNex", "Bağlantı bərpa olundu.", null);
+                // Qoşulma bildirişi 3 san sonra getsin
+                ShowPopup("FinNex", "Bağlantı bərpa olundu.", null, autoCloseMs: 3000);
                 return Task.CompletedTask;
             };
 
             try
             {
                 await _hubConnection.StartAsync();
+                // Xər gəldin bildirişi 3 san sonra getsin
                 ShowPopup("FinNex Sistem qoruyucusu",
-                    $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.", null);
+                    $"Xoş gəldiniz, {_isciAd}. Bildirişlər aktivdir.",
+                    null, autoCloseMs: 3000);
             }
             catch { }
         }
 
-        private void ShowPopup(string bashliq, string metn, string? url)
+        private void ShowPopup(string bashliq, string metn, string? url, int autoCloseMs = 0)
         {
             _uiContext.Post(_ =>
             {
@@ -98,7 +102,7 @@ namespace FinNex.DesktopAgent
 
                 if (url != null) { _unreadCount++; RefreshIcon(); }
 
-                var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl);
+                var popup = new NotificationPopup(bashliq, metn, url, _config.BaseUrl, autoCloseMs);
                 popup.FormClosed += (__, _e) =>
                 {
                     if (url != null)
