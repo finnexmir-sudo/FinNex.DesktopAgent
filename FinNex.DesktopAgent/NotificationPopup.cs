@@ -89,16 +89,22 @@ namespace FinNex.DesktopAgent
                 int       step     = 0;
                 _progressRatio     = 1f;
 
-                // Tam ad: System.Windows.Forms.Timer
                 var timer = new System.Windows.Forms.Timer { Interval = interval };
                 timer.Tick += (_, _) =>
                 {
                     step++;
                     _progressRatio = 1f - (float)step / steps;
                     _canvas.Invalidate();
-                    if (step >= steps) { timer.Stop(); timer.Dispose(); Close(); }
+                    if (step >= steps)
+                    {
+                        timer.Stop();
+                        timer.Dispose();
+                        if (!IsDisposed) Close();
+                    }
                 };
-                Shown += (_, _) => timer.Start();
+                // Timer birbaşa başlayır — Shown hadisəsindən asılı deyil.
+                // İlk tick 75 ms sonradır, bu vaxta qədər Show()/Refresh() artıq çağrılıb.
+                timer.Start();
             }
         }
 
