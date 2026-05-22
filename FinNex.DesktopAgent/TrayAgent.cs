@@ -42,7 +42,7 @@ namespace FinNex.DesktopAgent
             contextMenu.Items.Add("Çıxış", null, (s, e) => Exit());
             _notifyIcon.ContextMenuStrip = contextMenu;
 
-            _ = ConnectAsync();
+            _ = Task.Run(ConnectAsync);
         }
 
         private async Task ConnectAsync()
@@ -77,8 +77,9 @@ namespace FinNex.DesktopAgent
 
             try
             {
-                await _hubConnection.StartAsync().ConfigureAwait(false);
-                // Xos geldin ve reconnect popup-lari silindi — ses-kuy olmadan arxa fonda işləyir.
+                // Task.Run içində çağrılır (SynchronizationContext = null).
+                // SignalR daxili loopları üçün UI context-i tutmur — UI donmaz.
+                await _hubConnection.StartAsync();
             }
             catch { }
         }
