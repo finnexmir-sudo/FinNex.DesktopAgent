@@ -35,7 +35,7 @@ namespace FinNex.DesktopAgent
 
             // NotifyIcon Component-dir və pəncərə handle-i yaratmır, ona görə
             // WinForms SynchronizationContext avtomatik quraşdırılmır. SignalR
-            // thread-indən UI thread-ə düzgün keçid üçün UI thread-də handle-i
+            // thread-indən UI thread-ə düzğün keçid üçün UI thread-də handle-i
             // olan görünməz Control yaradırıq.
             _uiMarshal = new Control();
             _ = _uiMarshal.Handle;
@@ -47,7 +47,7 @@ namespace FinNex.DesktopAgent
                 Visible = true
             };
 
-            // ── Context menyu ─────────────────────────────────────
+            // ── Context menyu ─────────────────────
             _startupMenuItem = new ToolStripMenuItem(
                 StartupLabel(), null, OnStartupToggle);
 
@@ -64,7 +64,7 @@ namespace FinNex.DesktopAgent
             _ = Task.Run(ConnectAsync);
         }
 
-        // ── Startup toggle ────────────────────────────────────────
+        // ── Startup toggle ────────────────────
 
         private static string StartupLabel() =>
             (StartupHelper.IsEnabled() ? "✓  " : "    ") + "Windows ilə başla";
@@ -75,7 +75,7 @@ namespace FinNex.DesktopAgent
             _startupMenuItem.Text = StartupLabel();
         }
 
-        // ── Yenidən Giriş Et ──────────────────────────────────────
+        // ── Yenidən Giriş Et ──────────────────
 
         private void OnReLogin(object? sender, EventArgs e)
         {
@@ -91,7 +91,7 @@ namespace FinNex.DesktopAgent
             Exit();
         }
 
-        // ── SignalR bağlantısı ──────────────────────────────────────
+        // ── SignalR bağlantısı ──────────────────
 
         private async Task ConnectAsync()
         {
@@ -111,9 +111,16 @@ namespace FinNex.DesktopAgent
                 {
                     TimeSpan.FromSeconds(2),
                     TimeSpan.FromSeconds(5),
-                    TimeSpan.FromSeconds(10)
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(30),
+                    TimeSpan.FromSeconds(60)
                 })
                 .Build();
+
+            // VM yük altında serverin cavab vaxtı uzana bilir.
+            // Default ServerTimeout = 30s — bunu artırırıq.
+            _hubConnection.ServerTimeout  = TimeSpan.FromSeconds(120);
+            _hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(30);
 
             _hubConnection.On<JsonElement>("ReceiveDesktopNotification", payload =>
             {
@@ -160,7 +167,7 @@ namespace FinNex.DesktopAgent
                 {
                     _connected = false;
                     RefreshIconSafe();
-                    ShowBalloon("Bağlantı kəsildi — yenidən qoşulmağa çalışılır...",
+                    ShowBalloon("Bağlantı kəsildi — yenidən qoşulmaqıa çalışılır...",
                         ToolTipIcon.Warning);
                     _ = ReconnectLoopAsync();
                 }
@@ -181,9 +188,9 @@ namespace FinNex.DesktopAgent
             }
         }
 
-        // ── Yenidən qoşulma loop-u ──────────────────────────────────
-        // Server uzun müddət bağlı qalıb daxili auto-reconnect tükənəndə,
-        // hər 10 saniyədən bir yenidən qoşulmağa cəhd edir.
+        // ── Yenidən qoşulma loop-u ──────────────────
+        // Server uzun müdґət bağlı qalıb daxili auto-reconnect tükənəndə,
+        // hər 10 saniyədən bir yenidən qoşulmaqıa cəhd edir.
         private async Task ReconnectLoopAsync()
         {
             if (_reconnectLoopActive) return;
@@ -210,7 +217,7 @@ namespace FinNex.DesktopAgent
             finally { _reconnectLoopActive = false; }
         }
 
-        // ── Balloon bildirişi ───────────────────────────────────────
+        // ── Balloon bildirişi ───────────────────
 
         private void ShowBalloon(string metn, ToolTipIcon icon)
         {
@@ -227,7 +234,7 @@ namespace FinNex.DesktopAgent
             catch { }
         }
 
-        // ── Popup bildirişi ─────────────────────────────────────────
+        // ── Popup bildirişi ────────────────────
 
         private void ShowPopup(string bashliq, string metn, string? url,
                                int nov, int autoCloseMs = 0)
@@ -248,7 +255,7 @@ namespace FinNex.DesktopAgent
             catch { }
         }
 
-        // ── Tray icon ─────────────────────────────────────────────
+        // ── Tray icon ─────────────────────
 
         // Popup-lardan gələn badge sayı (UI thread-də çağrılır).
         private void OnUnreadChanged(int total)
@@ -312,7 +319,7 @@ namespace FinNex.DesktopAgent
             return icon;
         }
 
-        // ── Çıxış ───────────────────────────────────────────────
+        // ── Çıxış ────────────────────────
 
         private void Exit()
         {
