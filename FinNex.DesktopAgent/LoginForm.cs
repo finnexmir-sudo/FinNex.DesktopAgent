@@ -62,9 +62,17 @@ namespace FinNex.DesktopAgent
 
             try
             {
-                using var client = new HttpClient();
+                // SSL validation (inkişaf mühiti üçün self-signed sertifikatlara icazə)
+                var handler = new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+                };
+                using var client = new HttpClient(handler);
+
+                // _config.FullTokenUrl → BaseUrl.TrimEnd('/') + "/api/desktop/token"
+                // Bu şəkildə BaseUrl sonunda "/" olsa belə ikiqat slash yaranmır.
                 var response = await client.PostAsJsonAsync(
-                    $"{_config.BaseUrl}/api/desktop/token",
+                    _config.FullTokenUrl,
                     new { username = txtUsername.Text, password = txtPassword.Text });
 
                 if (response.IsSuccessStatusCode)
@@ -77,14 +85,30 @@ namespace FinNex.DesktopAgent
                     this.DialogResult = DialogResult.OK;
                     this.Close();
                 }
+                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    lblError.Text = "İstifadəçi adı və ya şifrə yanlışdır.";
+                }
+                else if ((int)response.StatusCode == 429)
+                {
+                    lblError.Text = "Hesab müvəqqəti bloklanıb. Bir az sonra cəhd edin.";
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    lblError.Text = "Bu hesab masaüstü agentə icazəsizdir (işçiyə bağlı deyil).";
+                }
                 else
                 {
-                    lblError.Text = "Giriş uğursuzdur! Məlumatları yoxlayın.";
+                    lblError.Text = $"Server xətası: {(int)response.StatusCode} {response.StatusCode}";
                 }
             }
-            catch
+            catch (HttpRequestException ex)
             {
-                lblError.Text = "Serverlə əlaqə qurulmadı!";
+                lblError.Text = $"Serverə qoşulmaq mümkün olmadı: {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                lblError.Text = $"Xəta: {ex.Message}";
             }
             finally
             {
