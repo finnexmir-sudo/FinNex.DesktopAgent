@@ -95,8 +95,9 @@ namespace FinNex.DesktopAgent
 
         private async Task ConnectAsync()
         {
-            var hubUrl = $"{_config.BaseUrl}/notificationHub" +
-                         $"?access_token={_token}&isciId={_isciId}";
+            // _config.FullHubUrl → BaseUrl.TrimEnd('/') + "/notificationHub"
+            // Bu şəkildə BaseUrl sonunda "/" olsa belə ikiqat slash yaranmır.
+            var hubUrl = $"{_config.FullHubUrl}?access_token={_token}&isciId={_isciId}";
 
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
