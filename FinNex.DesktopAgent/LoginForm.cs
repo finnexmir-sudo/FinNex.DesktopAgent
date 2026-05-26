@@ -62,12 +62,16 @@ namespace FinNex.DesktopAgent
 
             try
             {
-                // SSL bypass yalnız konfiqurasiyada AllowSelfSignedCert=true olduqda aktivdir.
-                // İşçilərin kompüterlərindəki appsettings.json-da false olmalıdır.
+#if DEBUG
+                // Yalnız DEBUG build-də self-signed sertifikatlara icazə verilir.
+                // Release build-də bu kod tamamilə mövcud deyil (compiled binary-ə daxil olmur).
                 var handler = new HttpClientHandler();
                 if (_config.AllowSelfSignedCert)
                     handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
                 using var client = new HttpClient(handler);
+#else
+                using var client = new HttpClient();
+#endif
 
                 // _config.FullTokenUrl → BaseUrl.TrimEnd('/') + "/api/desktop/token"
                 // Bu şəkildə BaseUrl sonunda "/" olsa belə ikiqat slash yaranmır.
