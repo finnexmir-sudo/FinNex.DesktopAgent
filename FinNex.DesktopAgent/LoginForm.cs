@@ -62,11 +62,11 @@ namespace FinNex.DesktopAgent
 
             try
             {
-                // SSL validation (inkişaf mühiti üçün self-signed sertifikatlara icazə)
-                var handler = new HttpClientHandler
-                {
-                    ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-                };
+                // SSL bypass yalnız konfiqurasiyada AllowSelfSignedCert=true olduqda aktivdir.
+                // İşçilərin kompüterlərindəki appsettings.json-da false olmalıdır.
+                var handler = new HttpClientHandler();
+                if (_config.AllowSelfSignedCert)
+                    handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
                 using var client = new HttpClient(handler);
 
                 // _config.FullTokenUrl → BaseUrl.TrimEnd('/') + "/api/desktop/token"
