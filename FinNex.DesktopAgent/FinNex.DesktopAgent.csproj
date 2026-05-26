@@ -17,6 +17,13 @@
     <FileVersion>1.0.0.0</FileVersion>
     <Version>1.0.0</Version>
     <NeutralLanguage>az-Latn-AZ</NeutralLanguage>
+
+    <!--
+      Self-Contained publish zamanı RuntimeIdentifier məcburidir.
+      Normal Debug/Release build-ə təsiri yoxdur.
+      Publish üçün: dotnet publish -p:PublishProfile=SelfContained-Win64
+    -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>
