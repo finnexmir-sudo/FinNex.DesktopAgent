@@ -6,6 +6,17 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Assembly metadata — antivirus və SmartScreen üçün proqramı tanıdır -->
+    <AssemblyTitle>FinNex Desktop Agent</AssemblyTitle>
+    <AssemblyDescription>FinNex işçi bildiriş agenti — real vaxtlı masa üstü bildirişlər</AssemblyDescription>
+    <Company>FinNex</Company>
+    <Product>FinNex Desktop Agent</Product>
+    <Copyright>Copyright © FinNex 2025</Copyright>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <NeutralLanguage>az-Latn-AZ</NeutralLanguage>
   </PropertyGroup>
 
   <ItemGroup>

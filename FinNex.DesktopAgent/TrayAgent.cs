@@ -91,13 +91,15 @@ namespace FinNex.DesktopAgent
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
                 {
-                    // SSL bypass yalnız konfiqurasiyada AllowSelfSignedCert=true olduqda aktivdir.
-                    // İşçilərin kompüterlərindəki appsettings.json-da false olmalıdır.
+#if DEBUG
+                    // Yalnız DEBUG build-də self-signed sertifikatlara icazə verilir.
+                    // Release build-də bu kod tamamilə mövcud deyil (compiled binary-ə daxil olmur).
                     if (_config.AllowSelfSignedCert)
                         options.HttpMessageHandlerFactory = _ => new HttpClientHandler
                         {
                             ServerCertificateCustomValidationCallback = (_, _, _, _) => true
                         };
+#endif
                 })
                 .WithAutomaticReconnect(new[]
                 {
