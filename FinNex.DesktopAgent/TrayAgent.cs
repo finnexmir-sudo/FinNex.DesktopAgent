@@ -77,7 +77,7 @@ namespace FinNex.DesktopAgent
             {
                 Process.Start(new ProcessStartInfo(Application.ExecutablePath)
                 {
-                    UseShellExecute = true
+                    UseShellExecute = false
                 });
             }
             catch { }
@@ -91,10 +91,13 @@ namespace FinNex.DesktopAgent
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(hubUrl, options =>
                 {
-                    options.HttpMessageHandlerFactory = _ => new HttpClientHandler
-                    {
-                        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-                    };
+                    // SSL bypass yalnız konfiqurasiyada AllowSelfSignedCert=true olduqda aktivdir.
+                    // İşçilərin kompüterlərindəki appsettings.json-da false olmalıdır.
+                    if (_config.AllowSelfSignedCert)
+                        options.HttpMessageHandlerFactory = _ => new HttpClientHandler
+                        {
+                            ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+                        };
                 })
                 .WithAutomaticReconnect(new[]
                 {
