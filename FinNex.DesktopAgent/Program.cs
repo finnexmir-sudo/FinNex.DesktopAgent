@@ -30,6 +30,7 @@ namespace FinNex.DesktopAgent
             var cached = TokenCache.Load();
             if (cached != null)
             {
+                StartupHelper.Enable();
                 Application.Run(
                     new TrayAgent(config, cached.Token, cached.IsciId, cached.IsciAd));
             }
