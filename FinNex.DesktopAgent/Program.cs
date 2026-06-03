@@ -40,6 +40,7 @@ namespace FinNex.DesktopAgent
                 if (loginForm.ShowDialog() == DialogResult.OK)
                 {
                     TokenCache.Save(loginForm.Token, loginForm.IsciId, loginForm.IsciAd);
+                    StartupHelper.Enable();
                     Application.Run(
                         new TrayAgent(config, loginForm.Token, loginForm.IsciId, loginForm.IsciAd));
                 }
